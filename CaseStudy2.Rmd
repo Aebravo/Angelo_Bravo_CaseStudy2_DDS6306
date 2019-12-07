@@ -1,0 +1,128 @@
+---
+title: "Case Study 2"
+author: "Angelo Bravo"
+date: "12/6/2019"
+output: html_document
+---
+
+```{r message = FALSE}
+#install.packages("knncat")
+library(knncat)
+library(caret)
+library(dplyr)
+library(MASS)
+
+
+df <- read.csv("/Users/angelobravo/Downloads/MDS-6306-Doing-Data-Science-Fall-2019-Master-7/Unit 14 and 15 Case Study 2/CaseStudy2-data.csv", header = T)
+
+
+set.seed(123)
+####################attempting to fit knn-model
+df1 <- df[complete.cases(df), ]
+
+df1$labels <- ifelse(df1$Attrition == "No", 0, 1)
+df1$labels <- as.factor(df1$labels)
+df1 <- df1[, !(names(df1) %in% c("ID","Over18", "EmployeeCount", "StandardHours", "Attrition"))]
+
+train_ind <- sample(1:nrow(df1), round(.75 * nrow(df1)))
+train <- df1[train_ind,]
+test <- df1[-train_ind,]
+```
+
+
+
+
+Here I attempt to fit a KNN model including categorical variables, which results in a decent accuracy (83.49%), but very low specificity. 
+```{r}
+knn_model <- knncat(train, test, k = 5, classcol = 32)
+confusionMatrix(as.factor(knn_model$test.classes), as.factor(test$labels))
+####################knn model has very low specificity
+```
+
+```{r}
+####################attempting to fit logistic regression model
+df1 <- df[complete.cases(df), ]
+df1$labels <- ifelse(df1$Attrition == "No", 0, 1)
+df1$labels <- as.factor(df1$labels)
+df1 <- df1[, !(names(df1) %in% c("ID", "Attrition","Over18", "EmployeeCount", "StandardHours"))]
+train_ind <- sample(1:nrow(df1), round(.75 * nrow(df1)))
+train <- df1[train_ind,]
+test <- df1[-train_ind,]
+```
+
+
+
+
+
+I now fit a logistic regression and select my explanatory variables with backward stepwise selection, utilizing AIC as a deciding metric. 
+```{r}
+logistic <- glm(labels ~., family = binomial(link = 'logit'), data = train) %>% stepAIC(trace = FALSE)
+
+no_attrition <- read.csv("/Users/angelobravo/Downloads/MDS-6306-Doing-Data-Science-Fall-2019-Master-7/Unit 14 and 15 Case Study 2/CaseStudy2CompSet No Attrition.csv", header = T)
+```
+
+
+
+
+
+
+Here is a summary of our explanatory variable coefficients and their respective significance. Some of their p-values indicate that certain cofficient are not significant predictors not at a .05 signficance. However, the AIC stepwise method attempts to find the best parsimonious model, with minimal bias. From this model, an accuracy of 88.53%, sensitivity of 90%, and specificity of 72.22% was attained.
+```{r}
+summary(logistic)
+
+no_attrition <- no_attrition[, !(names(no_attrition) %in% c("ID","Attrition","Over18", "EmployeeCount", "StandardHours"))]
+
+results <- ifelse(predict(logistic, test, type = "response") < .5, 0, 1)
+attr(results, "names") <- NULL
+
+confusionMatrix(as.factor(test$labels), as.factor(results))
+```
+
+
+```{r}
+no_att_results <- ifelse(predict(logistic, no_attrition, type = "response") <.5, 0, 1)
+Attrition <- ifelse(no_att_results == 0, "No", "Yes")
+no_att_df <- as.data.frame(Attrition)
+write.csv(no_att_df, "/Users/angelobravo/Downloads/case2PredictionsBRAVO Attrition.csv", row.names = TRUE, quote = FALSE)
+##################################################
+
+
+
+
+
+################REGRESSION
+df2 <- df[complete.cases(df), ]
+df2 <- df2[, !(names(df2) %in% c("Over18", "EmployeeCount", "StandardHours", "ID"))]
+
+train_ind <- sample(1:nrow(df2), round(.75 * nrow(df2)))
+train <- df2[train_ind,]
+test <- df2[-train_ind,]
+```
+
+
+
+
+Here I fit a linear model to accurately assess monthly income based on 31 explanatory variables. I select my explanatory variables with forward stepwise selection, utilizing AIC as a deciding metric. Some of the p-values of the explanatory indicate that certain cofficient are not significant predictors not at a .05 signficance. However, the AIC stepwise method attempts to find the best parsimonious model, with minimal bias.On a test set, an RMSE of 1120.312 was attained.
+```{r}
+linear_model <- lm(MonthlyIncome ~., data = train) 
+
+summary(linear_model)
+
+step.model <- stepAIC(linear_model, direction = "forward", 
+                      trace = TRUE)
+summary(step.model)
+
+results <- predict(step.model, test)
+attr(results, "names") <- NULL
+
+RMSE <- sqrt(sum((results-test$MonthlyIncome)^2)/length(results))
+
+no_sal <- read.csv("/Users/angelobravo/Downloads/MDS-6306-Doing-Data-Science-Fall-2019-Master-7/Unit 14 and 15 Case Study 2/CaseStudy2CompSet No Salary.csv",header = T)
+
+Results <- predict(step.model, no_sal)
+attr(Results, "names") <- NULL
+results_df <- as.data.frame(Results)
+write.csv(results_df, "/Users/angelobravo/Downloads/case2PredictionsBRAVO Salary.csv", row.names = TRUE, quote = FALSE)
+
+paste("RMSE: ", RMSE)
+```

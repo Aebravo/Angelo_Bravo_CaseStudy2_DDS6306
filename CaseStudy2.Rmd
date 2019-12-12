@@ -2,7 +2,9 @@
 title: "Case Study 2"
 author: "Angelo Bravo"
 date: "12/6/2019"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r message = FALSE}
@@ -11,6 +13,10 @@ library(knncat)
 library(caret)
 library(dplyr)
 library(MASS)
+library(VIF)
+library(ggplot2)
+library(GGally)
+library(ggthemes)
 
 
 df <- read.csv("/Users/angelobravo/Downloads/MDS-6306-Doing-Data-Science-Fall-2019-Master-7/Unit 14 and 15 Case Study 2/CaseStudy2-data.csv", header = T)
@@ -30,6 +36,48 @@ test <- df1[-train_ind,]
 ```
 
 
+
+Attrition EDA
+```{r message=FALSE}
+#Not much difference in the following
+df %>% ggplot(aes(x = WorkLifeBalance, y = ..density.., fill = Attrition)) + 
+  geom_histogram() + 
+  facet_wrap(facet = vars(Attrition)) +
+  ylab("Density") +
+  xlab("Work-Life Balance Rating") + 
+  ggtitle("Work Life Balance") +
+  theme_base()
+
+
+df %>% ggplot(aes(x = NumCompaniesWorked, y = ..density.., fill = Attrition)) + 
+  geom_histogram() + 
+  facet_wrap(facet = vars(Attrition)) +
+  ylab("Density") +
+  xlab("Number of Companies Worked") + 
+  ggtitle("Number of Companies Worked") +
+  theme_base()
+
+
+#noticeable difference in the following
+df %>% ggplot(aes(x = JobSatisfaction, y = ..density.., fill = Attrition)) + 
+  geom_histogram() + 
+  facet_wrap(facet = vars(Attrition)) +
+  ylab("Density") +
+  xlab("Job Satisfaction Rating") + 
+  ggtitle("Job Satisfaction") +
+  theme_base()
+
+df %>% ggplot(aes(x = JobInvolvement, y = ..density.., fill = Attrition)) + 
+  geom_histogram() + 
+  facet_wrap(facet = vars(Attrition)) +
+  ylab("Density") +
+  xlab("Job Involvement Rating") + 
+  ggtitle("Job Involvement") +
+  theme_base()
+
+
+
+```
 
 
 Here I attempt to fit a KNN model including categorical variables, which results in a decent accuracy (83.49%), but very low specificity. 
@@ -66,7 +114,7 @@ no_attrition <- read.csv("/Users/angelobravo/Downloads/MDS-6306-Doing-Data-Scien
 
 
 
-Here is a summary of our explanatory variable coefficients and their respective significance. Some of their p-values indicate that certain cofficient are not significant predictors not at a .05 signficance. However, the AIC stepwise method attempts to find the best parsimonious model, with minimal bias. From this model, an accuracy of 88.53%, sensitivity of 90%, and specificity of 72.22% was attained.
+Here is a summary of our explanatory variable coefficients and their respective significance. Some of their p-values indicate that certain cofficient are not significant predictors not at an alpha=.05 signficance level. However, the AIC stepwise method attempts to find the best parsimonious model, with minimal bias. From this model, an accuracy of 88.53%, sensitivity of 90%, and specificity of 72.22% was attained.
 ```{r}
 summary(logistic)
 
@@ -99,8 +147,41 @@ train <- df2[train_ind,]
 test <- df2[-train_ind,]
 ```
 
+Monthly Income EDA
+```{r message = FALSE}
+#######EDA Salary 
+##average income by age
+avg_income_age <- df %>% filter(is.na(df$Age) == FALSE) %>% 
+  dplyr::select(Age, MonthlyIncome) %>% 
+  mutate(decade = cut(df$Age, c(10,20,30,40,50, 60, 70), 
+                      labels = c("10s","20s", "30s", "40s", "50s", "60s"))) %>% 
+  group_by(decade) %>% 
+  summarize(avg_income_age = mean(MonthlyIncome))
 
+avg_income_age <- as.data.frame(avg_income_age) 
+avg_income_age <- avg_income_age[order(avg_income_age$avg_income_age),]
 
+avg_income_age %>% ggplot(aes(x=decade, y=avg_income_age, fill = decade)) +
+  geom_bar(stat="identity") +
+  xlab("Age (Decade)") +
+  ylab("Average Monthly Income") +
+  ggtitle("Average Income by Age") +
+  theme_economist()
+
+#regression of income with age gradient and facet wrap by department
+df %>% ggplot(aes(x = Age, y = MonthlyIncome, color = Department)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") + 
+  facet_wrap(facets = vars(Department)) +
+  xlab("Age") +
+  ylab("Montly Income") +
+  ggtitle("Monthly Income vs. Age (By Department)") +
+  theme_base()
+
+ggpairs(df %>% dplyr::select(MonthlyIncome, Age, Department), aes(color = Department)) +
+  theme_base()
+
+```
 
 Here I fit a linear model to accurately assess monthly income based on 31 explanatory variables. I select my explanatory variables with forward stepwise selection, utilizing AIC as a deciding metric. Some of the p-values of the explanatory indicate that certain cofficient are not significant predictors not at a .05 signficance. However, the AIC stepwise method attempts to find the best parsimonious model, with minimal bias.On a test set, an RMSE of 1120.312 was attained.
 ```{r}
